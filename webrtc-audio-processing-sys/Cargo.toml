@@ -17,7 +17,6 @@ travis-ci = { repository = "tonarino/webrtc-audio-processing", branch = "master"
 maintenance = { status = "actively-developed" }
 
 [features]
-default = ["sr-48000"]
 derive_serde = ["serde"]
 bundled = []
 sr-8000 = []
