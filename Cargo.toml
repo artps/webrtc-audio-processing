@@ -17,6 +17,10 @@ maintenance = { status = "actively-developed" }
 [features]
 derive_serde = ["webrtc-audio-processing-sys/derive_serde", "serde"]
 bundled = ["webrtc-audio-processing-sys/bundled"]
+sr-8000 = ["webrtc-audio-processing-sys/sr-8000"]
+sr-16000 = ["webrtc-audio-processing-sys/sr-16000"]
+sr-32000 = ["webrtc-audio-processing-sys/sr-32000"]
+sr-48000 = ["webrtc-audio-processing-sys/sr-48000"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"], optional = true }
