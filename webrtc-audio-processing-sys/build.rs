@@ -152,12 +152,52 @@ fn derive_serde(binding_file: &Path) -> Result<()> {
     Ok(())
 }
 
+fn debug_print_env_prelude() {
+    println!("cargo:warning=--- webrtc-audio-processing-sys/build.rs DEBUG ---");
+
+    for k in [
+        "HOST",
+        "TARGET",
+        "PROFILE",
+        "OUT_DIR",
+        "CARGO_CFG_TARGET_OS",
+        "CARGO_CFG_TARGET_ARCH",
+        "RUSTC",
+        "RUSTFLAGS",
+        "BUILD_WORKSPACE_DIRECTORY", // Bazel
+        "BAZEL",
+        "RULES_RUST_TOOLCHAIN",
+    ] {
+        println!("cargo:warning={}={:?}", k, std::env::var_os(k));
+    }
+
+    for k in [
+        "CARGO_FEATURE_BUNDLED",
+        "CARGO_FEATURE_SR_8000",
+        "CARGO_FEATURE_SR_16000",
+        "CARGO_FEATURE_SR_32000",
+        "CARGO_FEATURE_SR_48000",
+    ] {
+        println!("cargo:warning={}={:?}", k, std::env::var_os(k));
+    }
+
+    println!("cargo:warning={}={:?}", SAMPLE_RATE_ENV, std::env::var_os(SAMPLE_RATE_ENV));
+}
+
+fn debug_print_choice(label: &str, sr: &str) {
+    println!("cargo:warning=APM sample rate ({}) = {}", label, sr);
+}
+
 fn main() -> Result<()> {
+    debug_print_env_prelude();
+
     webrtc::build_if_necessary()?;
     let (webrtc_include, webrtc_lib) = webrtc::get_build_paths()?;
 
     // Determine the sample rate from env or Cargo features.
     let sample_rate = choose_sample_rate();
+    debug_print_choice("features/env", &sample_rate);
+
     // Re-run build if the env var changes.
     println!("cargo:rerun-if-env-changed={}", SAMPLE_RATE_ENV);
     let mut cc_build = cc::Build::new();
