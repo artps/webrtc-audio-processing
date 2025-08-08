@@ -7,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+const SAMPLE_RATE_ENV: &str = "WAP_SAMPLE_RATE_HZ";
 const DEPLOYMENT_TARGET_VAR: &str = "MACOSX_DEPLOYMENT_TARGET";
 
 fn out_dir() -> PathBuf {
@@ -155,6 +156,10 @@ fn main() -> Result<()> {
     webrtc::build_if_necessary()?;
     let (webrtc_include, webrtc_lib) = webrtc::get_build_paths()?;
 
+    // Determine the sample rate from env or Cargo features.
+    let sample_rate = choose_sample_rate();
+    // Re-run build if the env var changes.
+    println!("cargo:rerun-if-env-changed={}", SAMPLE_RATE_ENV);
     let mut cc_build = cc::Build::new();
 
     // set mac minimum version
@@ -184,6 +189,7 @@ fn main() -> Result<()> {
         .flag("-Wno-deprecated-declarations")
         .flag("-std=c++11")
         .out_dir(&out_dir())
+        .define("WAP_SAMPLE_RATE_HZ", Some(sample_rate.as_str()))
         .compile("webrtc_audio_processing_wrapper");
 
     println!("cargo:rustc-link-search=native={}", webrtc_lib.display());
@@ -206,12 +212,16 @@ fn main() -> Result<()> {
     let binding_file = out_dir().join("bindings.rs");
     bindgen::Builder::default()
         .header("src/wrapper.hpp")
+        .clang_arg("-x")
+        .clang_arg("c++")
+        .clang_arg("-std=c++11")
         .generate_comments(true)
         .rustified_enum(".*")
         .derive_debug(true)
         .derive_default(true)
         .derive_partialeq(true)
         .clang_arg(&format!("-I{}", &webrtc_include.display()))
+        .clang_arg(format!("-DWAP_SAMPLE_RATE_HZ={}", sample_rate))
         .disable_name_namespacing()
         .generate()
         .expect("Unable to generate bindings")
@@ -223,4 +233,40 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+// Choose sample rate based on env var or Cargo features.
+fn choose_sample_rate() -> String {
+    // First, honour an explicit environment variable.
+    if let Ok(v) = env::var(SAMPLE_RATE_ENV) {
+        validate_sample_rate(&v);
+        return v;
+    }
+
+    // Otherwise fall back to cargo features.
+    let mut selected = vec![];
+    for (feat_env, val) in [
+        ("CARGO_FEATURE_SR_8000", "8000"),
+        ("CARGO_FEATURE_SR_16000", "16000"),
+        ("CARGO_FEATURE_SR_32000", "32000"),
+        ("CARGO_FEATURE_SR_48000", "48000"),
+    ] {
+        if env::var_os(feat_env).is_some() {
+            selected.push(val);
+        }
+    }
+
+    match selected.as_slice() {
+        [] => "48000".to_string(),
+        [one] => (*one).to_string(),
+        _ => panic!("Enable only one sr-* feature or set {}", SAMPLE_RATE_ENV),
+    }
+}
+
+// Validate only acceptable sample rates.
+fn validate_sample_rate(v: &str) {
+    match v {
+        "8000" | "16000" | "32000" | "48000" => {},
+        _ => panic!("{} must be one of 8000, 16000, 32000 or 48000", SAMPLE_RATE_ENV),
+    }
 }
